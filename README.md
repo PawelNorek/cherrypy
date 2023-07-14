@@ -15,3 +15,5 @@ Activate cherrypy environment with 'source ./bin/activate'.
 Then you can start python script with 'python tut09.py'.
 
 Ouch!!! For this to run you will need mariadb database :)
+
+You know that you will need to install dependicies for python and npm? :)))
