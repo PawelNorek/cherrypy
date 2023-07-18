@@ -1,17 +1,23 @@
 import os, os.path
 import random
-import sqlite3
+# import sqlite3
 import mariadb
 import string
 import time
 from dotenv import dotenv_values
+import redis
 
-import cherrypy
-cherrypy.config.update({'server.socket_host': '192.168.1.191', 'server.socket_port': 8099})
-
-DB_STRING = "my.db"
+import cherrypy_cors
+cherrypy_cors.install()
 
 secrets=dotenv_values(".env")
+
+import cherrypy
+cherrypy.config.update({'server.socket_host': secrets["cherrypy_host"], 'server.socket_port': int(secrets["cherrypy_port"]), 'cors.expose.on': True,})
+
+redis = redis.Redis(secrets["redis_host"], port=int(secrets["redis_port"]), decode_responses=True, password=secrets["redis_password"])
+
+DB_STRING = "my.db"
 
 try:
     mariadbconn = mariadb.connect(
@@ -39,41 +45,52 @@ class StringGenerator(object):
     def index(self):
         return open('index.html')
 
+# @cherrypy_cors.tools.preflight(allowed_methods=['GET', 'POST', 'DELETE'])
 @cherrypy.expose
 # @cherrypy.tools.json_out()
 # @cherrypy.tools.json_in(force=False)
 class StringGeneratorWebService(object):
 
+    @cherrypy_cors.tools.preflight(allowed_methods=["GET", "DELETE", "PUT"])
+    def OPTIONS(self):
+        redisTS = redis.get('timestamp')
+        print('redis test options ', redisTS)
+        # pass
+
     @cherrypy.tools.accept(media='text/plain')
     def GET(self):
+        redis.set('timestamp', time.time())
         with mariadbconn.cursor() as c:
-            cherrypy.session['ts'] = time.time()
+            print('GET ', redis.get('timestamp'))
             r = c.execute("SELECT value FROM user_string WHERE session_id=?",
-                          [cherrypy.session.id])
+                          [redis.get('timestamp')])
         mariadbconn.commit()
         return r.fetchone()
 
     def POST(self, length=8):
+        redis.set('timestamp', time.time())
         some_string = ''.join(random.sample(string.hexdigits, int(length)))
         with mariadbconn.cursor() as c:
-            cherrypy.session['ts'] = time.time()
+            print('POST ', redis.get('timestamp'))
             c.execute("INSERT INTO user_string (session_id, value) VALUES (?, ?)",
-                      [cherrypy.session.id, some_string])
+                      [redis.get('timestamp'), some_string])
         mariadbconn.commit()
         return some_string
 
     def PUT(self, another_string):
         with mariadbconn.cursor() as c:
             cherrypy.session['ts'] = time.time()
+            print('PUT ', redis.get('timestamp'))
             c.execute("UPDATE user_string SET value=? WHERE session_id=?",
-                      [another_string, cherrypy.session.id])
+                      [another_string, redis.get('timestamp')])
         mariadbconn.commit()
 
+    # @cherrypy_cors.tools.preflight(allowed_methods=['GET', 'POST', 'DELETE'])
     def DELETE(self):
-        cherrypy.session.pop('ts', None)
         with mariadbconn.cursor() as c:
+            print('DELETE ', redis.get('timestamp'))
             c.execute("DELETE FROM user_string WHERE session_id=?",
-                      [cherrypy.session.id])
+                     [redis.get('timestamp')])
         mariadbconn.commit()
 
 
@@ -93,7 +110,6 @@ class StringGeneratorWebService(object):
 #     """
 #     with sqlite3.connect(DB_STRING) as con:
 #         con.execute("DROP TABLE user_string")
-
 
 if __name__ == '__main__':
     conf = {

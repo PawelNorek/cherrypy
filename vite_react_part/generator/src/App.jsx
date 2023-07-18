@@ -5,7 +5,7 @@ const StringGeneratorBox = () => {
 	const [string, setString] = useState('')
 	const [mode, setMode] = useState('create')
 
-	const url = '/generator'
+	const url = 'http://192.168.1.191:8099/generator'
 
 	const handleGenerate = () => {
 		let formdata = new FormData()
