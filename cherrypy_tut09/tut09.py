@@ -6,9 +6,17 @@ import string
 import time
 from dotenv import dotenv_values
 import redis
+import datetime
+
+import asyncio
+import websockets
+
+import jwt
 
 import cherrypy_cors
 cherrypy_cors.install()
+
+# from cherrypy.websocket import WebSocket
 
 secrets=dotenv_values(".env")
 
@@ -18,6 +26,17 @@ cherrypy.config.update({'server.socket_host': secrets["cherrypy_host"], 'server.
 redis = redis.Redis(secrets["redis_host"], port=int(secrets["redis_port"]), decode_responses=True, password=secrets["redis_password"])
 
 DB_STRING = "my.db"
+
+def authenticate(username, password):
+    if username == "admin" and password == "password":
+        # Create a JWT token with a subject claim "admin" and an expiration time of 1 hour
+        payload = {"sub": "admin", "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=1)}
+        token = jwt.encode(payload, secrets["jwt_secret"], algorithm="HS256")
+        return token
+    else:
+        return None
+
+print (authenticate("admin", "password"))
 
 try:
     mariadbconn = mariadb.connect(
@@ -45,7 +64,19 @@ class StringGenerator(object):
     def index(self):
         return open('index.html')
 
-# @cherrypy_cors.tools.preflight(allowed_methods=['GET', 'POST', 'DELETE'])
+# async def hello(websocket):
+#     name = await websocket.recv()
+#     print(f"<<< {name}")
+
+#     greeting = f"Hello {name}!"
+
+#     await websocket.send(greeting)
+#     print(f">>> {greeting}")
+
+# async def main():
+#     async with websockets.serve(hello, "192.168.1.191", 8765):
+#         await asyncio.Future()  # run forever
+
 @cherrypy.expose
 # @cherrypy.tools.json_out()
 # @cherrypy.tools.json_in(force=False)
@@ -67,7 +98,21 @@ class StringGeneratorWebService(object):
         mariadbconn.commit()
         return r.fetchone()
 
-    def POST(self, length=8):
+    # def POST(self, user="user", password="password"):
+    #     token = user + password
+    #     return token
+
+    def POST(self, *args, **kwargs):
+
+        length = kwargs.get("length", None)
+        if length == None:
+            length = 8
+        print("length is: ",length)
+        
+        user = kwargs.get("user", None)
+        
+        password = kwargs.get("password", None)
+        
         redis.set('timestamp', time.time())
         some_string = ''.join(random.sample(string.hexdigits, int(length)))
         with mariadbconn.cursor() as c:
@@ -85,7 +130,6 @@ class StringGeneratorWebService(object):
                       [another_string, redis.get('timestamp')])
         mariadbconn.commit()
 
-    # @cherrypy_cors.tools.preflight(allowed_methods=['GET', 'POST', 'DELETE'])
     def DELETE(self):
         with mariadbconn.cursor() as c:
             print('DELETE ', redis.get('timestamp'))
@@ -93,6 +137,14 @@ class StringGeneratorWebService(object):
                      [redis.get('timestamp')])
         mariadbconn.commit()
 
+    @cherrypy.expose
+    def websocket(self, **kwargs):
+        ws = websockets.connect('ws://192.168.1.191:8099/websocket')
+        print("New websocket connection")
+        while True:
+            message = ws.recv()
+            print("Received message: " + message)
+            ws.send("Hello, client!")
 
 # def setup_database():
 #     """
@@ -128,9 +180,13 @@ if __name__ == '__main__':
         }
     }
 
+    # asyncio.run(main())
+
     # cherrypy.engine.subscribe('start', setup_database)
     # cherrypy.engine.subscribe('stop', cleanup_database)
 
     webapp = StringGenerator()
     webapp.generator = StringGeneratorWebService()
     cherrypy.quickstart(webapp, '/', conf)
+
+    # asyncio.run(main())
