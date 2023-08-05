@@ -1,3 +1,4 @@
+import React from 'react'
 import StringGeneratorForm from './StringGenerateForm'
 import { useState } from 'react'
 
@@ -36,7 +37,7 @@ const StringGeneratorBox = () => {
 			body: formdata,
 		})
 			.then(() => {
-				setLength(newString.length)
+				setLength(newString.length.toString())
 				setString(newString)
 				setMode('edit')
 			})
@@ -59,14 +60,14 @@ const StringGeneratorBox = () => {
 			})
 	}
 
-	const handleLengthChange = newLength => {
+	const handleLengthChange = (newLength: React.SetStateAction<string>) => {
 		setLength(newLength)
 		setString('')
 		setMode('create')
 	}
 
-	const handleStringChange = newString => {
-		setLength(newString.length)
+	const handleStringChange = (newString: React.SetStateAction<string>) => {
+		setLength(newString.length.toString())
 		setString(newString)
 		setMode('edit')
 	}

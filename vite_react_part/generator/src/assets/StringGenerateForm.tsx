@@ -1,3 +1,5 @@
+import React from 'react'
+
 const StringGeneratorForm = ({
 	onCreateString,
 	onReplaceString,
@@ -8,28 +10,28 @@ const StringGeneratorForm = ({
 	length,
 	string,
 }) => {
-	const handleCreate = e => {
+	const handleCreate = (e: { preventDefault: () => void }) => {
 		e.preventDefault()
 		onCreateString()
 	}
 
-	const handleReplace = e => {
+	const handleReplace = (e: { preventDefault: () => void }) => {
 		e.preventDefault()
 		onReplaceString()
 	}
 
-	const handleDelete = e => {
+	const handleDelete = (e: { preventDefault: () => void }) => {
 		e.preventDefault()
 		onDeleteString()
 	}
 
-	const handleLengthChange = e => {
+	const handleLengthChange = (e: { preventDefault: () => void; target: { value: string } }) => {
 		e.preventDefault()
 		const newLength = e.target.value.trim()
 		onLengthChange(newLength)
 	}
 
-	const handleStringChange = e => {
+	const handleStringChange = (e: { preventDefault: () => void; target: { value: string } }) => {
 		e.preventDefault()
 		const newString = e.target.value.trim()
 		onStringChange(newString)
